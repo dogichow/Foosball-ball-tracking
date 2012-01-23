@@ -13,6 +13,8 @@ public:
     float hue, sat, bri;    
 };
 
+using namespace cv;
+
 class testApp : public ofBaseApp{
 public:
     void setup();
@@ -38,9 +40,15 @@ public:
     
     ofxCvContourFinder      ballFinder;                  //contour finder, very handy 
     ofVec2f ballPos;
+    ofVec2f kalmanBallPos;
     
     // OSC sender
     ofxOscSender sender;
+    
+    KalmanFilter KF;
+    Mat_<float> state;
+    Mat processNoise;
+    Mat_<float> measurement;
 };
 
 #endif

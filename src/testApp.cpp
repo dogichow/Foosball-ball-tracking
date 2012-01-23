@@ -2,9 +2,7 @@
 
 //--------------------------------------------------------------
 void testApp::setup(){    
-    
     // Allocate memory for images
-    
     colorImgHSV.allocate(camWidth,camHeight);   //our HSB image that will house the color image and deal out the Hue, Saturation and brightness
     hueImg.allocate(camWidth,camHeight);        //Hue map
     satImg.allocate(camWidth,camHeight);        //saturation map
@@ -17,6 +15,27 @@ void testApp::setup(){
     
     // Open communication protocol
     sender.setup( HOST, PORT );
+    
+    // Ball position init
+    ballPos = ofVec2f(0,0);
+    kalmanBallPos = ofVec2f(0,0);
+    
+    // Kalman Filter setup
+    KF = KalmanFilter(4, 2);
+    state = Mat_<float>(4, 1);
+    processNoise =  Mat(4, 1, CV_32F);
+    measurement = Mat_<float>(2, 1);
+    
+    measurement.setTo(Scalar(0));
+    
+    KF.statePre.at<float>(0) = ballPos.x;
+    KF.statePre.at<float>(1) = ballPos.y;
+    KF.statePre.at<float>(2) = 0;
+    KF.statePre.at<float>(3) = 0;
+    setIdentity(KF.measurementMatrix);
+    setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
+    setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
+    setIdentity(KF.errorCovPost, Scalar::all(.1));
 }
 
 //--------------------------------------------------------------
@@ -59,6 +78,19 @@ void testApp::update(){
         }
     }
     
+    // Kalman filter calculations
+    // First predict, to update the internal statePre variable
+    Mat prediction = KF.predict();
+    ofPoint predictPt(prediction.at<float>(0),prediction.at<float>(1));
+    
+    // Get mouse point
+    measurement(0) = ballPos.x;
+    measurement(1) = ballPos.y;
+        
+    // The "correct" phase that is going to use the predicted value and our measurement
+    Mat estimated = KF.correct(measurement);
+    kalmanBallPos = ofVec2f(estimated.at<float>(0),estimated.at<float>(1));
+    
     // Send ballPosition to server
     ofxOscMessage m;
     m.setAddress( "/ball_position" );
@@ -84,6 +116,9 @@ void testApp::draw(){
     // Draw ball position circle
     ofSetColor(255, 255, 0);
     ofCircle(ballPos, 5);
+    
+    ofSetColor(255, 0, 0);
+    ofCircle(kalmanBallPos, 3);
     glPopMatrix();
     
     ofColor c;
