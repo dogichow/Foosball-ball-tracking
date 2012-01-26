@@ -7,12 +7,6 @@
 
 #include "constants.h"
 
-class color
-{
-public:
-    float hue, sat, bri;    
-};
-
 using namespace cv;
 
 class testApp : public ofBaseApp{
@@ -22,6 +16,7 @@ public:
     void draw();
     
     void mousePressed(int x, int y, int button);
+    void keyPressed(int key);
     
     ofVideoGrabber 	vidGrabber;         //our video grabber
     
@@ -31,12 +26,27 @@ public:
     ofxCvGrayscaleImage		satImg;     //Saturation map
     ofxCvGrayscaleImage     briImg;     //Brightness map
     
+    ofxCvColorImage 	background;
+    
+    ofxCvGrayscaleImage		hueImgBg;     
+    ofxCvGrayscaleImage		satImgBg;    
+    ofxCvGrayscaleImage     briImgBg;   
+
+    ofxCvGrayscaleImage		hueImgPeaks;     //Hue map
+    ofxCvGrayscaleImage		satImgPeaks;     //Saturation map
+    ofxCvGrayscaleImage     briImgPeaks;     //Brightness map
+    
+    bool bLearnBackground;
+    int thresholdHue;
+    int thresholdSat;
+    int thresholdBri;
+    
     ofxCvGrayscaleImage     trackedImage;               //Grayscale image we are gonna run the contour finder over to find our color
     
-    color                   one;                //color that we're gonna track
+    unsigned char *         satPixelsRaw; 
+    unsigned char *         huePixelsRaw; 
+    unsigned char *         briPixelsRaw; 
     
-    unsigned char *         colorTrackedPixelsRed;      //just some raw images which we are gonna put pixels into
-    ofTexture               trackedTextureRed;          //color texture that we are gonna draw to
     
     ofxCvContourFinder      ballFinder;                  //contour finder, very handy 
     ofVec2f ballPos;

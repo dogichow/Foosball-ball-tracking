@@ -3,13 +3,33 @@
 //--------------------------------------------------------------
 void testApp::setup(){    
     // Allocate memory for images
-    colorImgHSV.allocate(camWidth,camHeight);   //our HSB image that will house the color image and deal out the Hue, Saturation and brightness
+    colorImgHSV.allocate(camWidth,camHeight);  
+    
     hueImg.allocate(camWidth,camHeight);        //Hue map
     satImg.allocate(camWidth,camHeight);        //saturation map
     briImg.allocate(camWidth,camHeight);        //brightness map, not gonna be used but necessary 
+    
+    hueImgBg.allocate(camWidth,camHeight);        //Hue map
+    satImgBg.allocate(camWidth,camHeight);        //saturation map
+    briImgBg.allocate(camWidth,camHeight);        //brightness map, not gonna be used but 
+    
+    hueImgPeaks.allocate(camWidth,camHeight);
+    satImgPeaks.allocate(camWidth,camHeight);
+    briImgPeaks.allocate(camWidth,camHeight);
+    
+    background.allocate(camWidth,camHeight);
+    bLearnBackground = true;
+    
+    thresholdHue = 80;
+    thresholdSat = 80;
+    thresholdBri = 200;
+    
     trackedImage.allocate(camWidth, camHeight);         //our postRange image basically
-    colorTrackedPixelsRed = new unsigned char [camWidth * camHeight];     //rangeImage
-    trackedTextureRed.allocate(camWidth, camHeight, GL_LUMINANCE);        //final output
+    
+    satPixelsRaw = new unsigned char [camWidth * camHeight];
+    huePixelsRaw = new unsigned char [camWidth * camHeight];
+    briPixelsRaw = new unsigned char [camWidth * camHeight];
+    
     vidGrabber.setVerbose(true);                    //just some text for debugging
     vidGrabber.initGrabber(camWidth,camHeight);     //start the show!
     
@@ -40,45 +60,63 @@ void testApp::setup(){
 
 //--------------------------------------------------------------
 void testApp::update(){
-    vidGrabber.grabFrame();                                                 //get a frame from the camera
+    vidGrabber.grabFrame();
     
-    colorImgHSV.setFromPixels(vidGrabber.getPixels(), camWidth, camHeight);    //remember that colorImg? put the camera image into it
-    colorImgHSV.convertRgbToHsv();                                          //now we convert the colorImg inside colorImgHSV into HSV
-    colorImgHSV.convertToGrayscalePlanarImages(hueImg, satImg, briImg);     //distribute the hue, saturation and brightness to hueImg, satImg, and briImg
+    colorImgHSV.setFromPixels(vidGrabber.getPixels(), camWidth, camHeight);    
+    colorImgHSV.convertRgbToHsv();     
+    
+    if (bLearnBackground) {
+        background = colorImgHSV;
+        bLearnBackground = false;
+    }
+    
+    colorImgHSV.convertToGrayscalePlanarImages(hueImg, satImg, briImg);    
+    background.convertToGrayscalePlanarImages(hueImgBg, satImgBg, briImgBg);  
     
     hueImg.flagImageChanged(); 
     satImg.flagImageChanged();
     briImg.flagImageChanged();
     
-    unsigned char * huePixels = hueImg.getPixels();                         //huePixels is now a raw array of pixels
-    unsigned char * satPixels = satImg.getPixels();                         //satPixels is now a raw array of pixels  just like huePixels
-    unsigned char * briPixels = briImg.getPixels();
-    int nPixels = camWidth * camHeight;                                     //get the number of pixels in the images since these raw images are continuous, so no breaks
+    hueImgBg.flagImageChanged(); 
+    satImgBg.flagImageChanged();
+    briImgBg.flagImageChanged();
     
-    // Color tracking filter
-    for (int i = 0; i < nPixels; i++){                                           
-        if ((huePixels[i] >= one.hue - 100 && huePixels[i] <= one.hue + 100) &&    
-            (satPixels[i] >= one.sat - 12 && satPixels[i] <= one.sat + 12)) {    
-            colorTrackedPixelsRed[i] = 255;                                 
-        } 
-        else {
-            colorTrackedPixelsRed[i] = 0;                                        
-        }
-    }
+    hueImgPeaks.absDiff(hueImgBg, hueImg);
+    hueImgPeaks.threshold(thresholdHue);
     
-    trackedImage.setFromPixels(colorTrackedPixelsRed, camWidth, camHeight);              // set reds from the colorTrackedPixelsRed array so it's all clean and openCv operable
-    trackedImage.setROI(0, ROI_Y_OFFSET, camWidth, ROI_Y_HEIGHT);                        // clamp
+    satImgPeaks.absDiff(satImgBg, satImg);
+    satImgPeaks.threshold(thresholdSat);
+
+    briImgPeaks.absDiff(briImgBg, briImg);
+    briImgPeaks.threshold(thresholdBri);
+
+//    // Load HSV pixels into arrays
+//    unsigned char* huePixels = hueImg.getPixels();                         
+//    unsigned char* satPixels = satImg.getPixels();                         
+//    unsigned char* briPixels = briImg.getPixels();
+//    
+//    // For iteration
+//    int nPixels = camWidth * camHeight;                                     
+//    
+//    hueImgPeaks.setFromPixels(huePixelsRaw, camWidth, camHeight);
+//    satImgPeaks.setFromPixels(satPixelsRaw, camWidth, camHeight);
+//    briImgPeaks.setFromPixels(briPixelsRaw, camWidth, camHeight);
     
-    ballFinder.findContours(trackedImage, 50, 100, 5, false, false);                  //lets find one (1) blob in the grayscale openCv image reds
+//    trackedImage.setROI(0, ROI_Y_OFFSET, camWidth, ROI_Y_HEIGHT);      // clamp
     
-    // Filter out random blobs and get ball position
-    for (int i = 0; i < ballFinder.blobs.size(); i++) {
-        if (ballFinder.blobs[i].boundingRect.width < 15 && ballFinder.blobs[i].boundingRect.height < 15) {
-            ballPos = ballFinder.blobs[i].centroid;
-        }
-    }
+//    ballFinder.findContours(trackedImage, 50, 100, 5, false, false);                
+//    
+//    // Filter out random blobs and get ball position
+//    for (int i = 0; i < ballFinder.blobs.size(); i++) {
+//        if (ballFinder.blobs[i].boundingRect.width < 15 && ballFinder.blobs[i].boundingRect.height < 15) {
+//            ballPos = ballFinder.blobs[i].centroid;
+//        }
+//    }
     
-    // Kalman filter calculations
+    /*************
+     Kalman filter
+    *************/
+    
     // First predict, to update the internal statePre variable
     Mat prediction = KF.predict();
     ofPoint predictPt(prediction.at<float>(0),prediction.at<float>(1));
@@ -90,6 +128,10 @@ void testApp::update(){
     // The "correct" phase that is going to use the predicted value and our measurement
     Mat estimated = KF.correct(measurement);
     kalmanBallPos = ofVec2f(estimated.at<float>(0),estimated.at<float>(1));
+    
+    /*************
+          OSC
+     *************/
     
     // Send ballPosition to server
     ofxOscMessage m;
@@ -121,16 +163,16 @@ void testApp::draw(){
     ofCircle(kalmanBallPos, 3);
     glPopMatrix();
     
-    ofColor c;
-    c.setHsb(one.hue, one.sat, one.bri);
-    ofSetColor(c);
-    
-    // Draw racked color reference
-    ofRect(700, 50, 0, 100, 100);
-    
-    // Draw HSV image
-	colorImgHSV.draw(340, 0);
+    // Draw hue, sat, bri RAW images
+	hueImg.draw(340, 0);
+    satImg.draw(340, 300);
+    briImg.draw(340, 600);
 		
+    // Draw hue, sat, bri PEAK images
+	hueImgPeaks.draw(680, 0);
+    satImgPeaks.draw(680, 300);
+    briImgPeaks.draw(680, 600);
+    
     // Draw ball position
     ofSetColor(255, 255, 255); 
     char label[255];
@@ -146,16 +188,14 @@ void testApp::draw(){
 //--------------------------------------------------------------
 void testApp::mousePressed(int x, int y, int button){
     
-    unsigned char * huePixels = hueImg.getPixels();  //teh hue
-    unsigned char * satPixels = satImg.getPixels();  //teh saturation
-    unsigned char * briPixels = briImg.getPixels();  //teh brightness*/ //unnecessary really, hue and sat should be enough
+}
+
+//--------------------------------------------------------------
+void testApp::keyPressed(int key){
     
-    x = MIN(x,hueImg.width-1);     //find the smallest value out of those two so we don't crash if we click outside of the camera image
-    y = MIN(y,hueImg.height-1);
-    
-    if(button == 0) {
-        one.hue = huePixels[x+(y*hueImg.width)];  //set the hue
-        one.sat = satPixels[x+(y*satImg.width)];  //set the sat
-        one.bri = briPixels[x+(y*briImg.width)];
-    }
+	switch (key){
+		case ' ':
+			bLearnBackground = true;
+			break;
+	}
 }
