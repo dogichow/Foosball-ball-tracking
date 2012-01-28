@@ -22,28 +22,35 @@ public:
     void draw();
     
     void mousePressed(int x, int y, int button);
+    void keyPressed  (int key);
     
     ofVideoGrabber 	vidGrabber;         //our video grabber
     
-    ofxCvColorImage		    colorImgHSV;    //the image doing the wrapping
+    ofxCvColorImage		    colorImg;    
+    ofxCvColorImage		    colorImgHSV;    
     
-    ofxCvGrayscaleImage		hueImg;     //Hue map
-    ofxCvGrayscaleImage		satImg;     //Saturation map
-    ofxCvGrayscaleImage     briImg;     //Brightness map
+    ofxCvGrayscaleImage		hueImg;     // Hue map
+    ofxCvGrayscaleImage		satImg;     // Saturation map
+    ofxCvGrayscaleImage     briImg;     // Brightness map
     
-    ofxCvGrayscaleImage     trackedImage;               //Grayscale image we are gonna run the contour finder over to find our color
+    ofxCvGrayscaleImage		redImg;     // Red map
+    ofxCvGrayscaleImage		greenImg;     // Gren map
+    ofxCvGrayscaleImage     blueImg;     // Blue map
     
-    color                   one;                //color that we're gonna track
+    ofxCvGrayscaleImage     trackedImage;                   
+    ofVec3f                 trackedColor;                
     
-    unsigned char *         colorTrackedPixelsRed;      //just some raw images which we are gonna put pixels into
-    ofTexture               trackedTextureRed;          //color texture that we are gonna draw to
+    unsigned char *         colorTrackedPixels;      
+    ofTexture               trackedTextureRed;         
     
-    ofxCvContourFinder      ballFinder;                  //contour finder, very handy 
+    ofxCvContourFinder      ballFinder;                  
     ofVec2f ballPos;
     ofVec2f kalmanBallPos;
     
     // OSC sender
     ofxOscSender sender;
+    
+    int cameraThreshold;
     
     KalmanFilter KF;
     Mat_<float> state;

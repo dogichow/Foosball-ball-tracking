@@ -3,12 +3,19 @@
 //--------------------------------------------------------------
 void testApp::setup(){    
     // Allocate memory for images
-    colorImgHSV.allocate(camWidth,camHeight);   //our HSB image that will house the color image and deal out the Hue, Saturation and brightness
+    colorImg.allocate(camWidth,camHeight);
+    colorImgHSV.allocate(camWidth,camHeight);  
+    
     hueImg.allocate(camWidth,camHeight);        //Hue map
     satImg.allocate(camWidth,camHeight);        //saturation map
-    briImg.allocate(camWidth,camHeight);        //brightness map, not gonna be used but necessary 
+    briImg.allocate(camWidth,camHeight);        //brightness map, not gonna be used but 
+    
+    redImg.allocate(camWidth,camHeight);        //Hue map
+    greenImg.allocate(camWidth,camHeight);        //saturation map
+    blueImg.allocate(camWidth,camHeight);        //brightness map, not gonna be used but 
+    
     trackedImage.allocate(camWidth, camHeight);         //our postRange image basically
-    colorTrackedPixelsRed = new unsigned char [camWidth * camHeight];     //rangeImage
+    colorTrackedPixels = new unsigned char [camWidth * camHeight];     //rangeImage
     trackedTextureRed.allocate(camWidth, camHeight, GL_LUMINANCE);        //final output
     vidGrabber.setVerbose(true);                    //just some text for debugging
     vidGrabber.initGrabber(camWidth,camHeight);     //start the show!
@@ -28,6 +35,8 @@ void testApp::setup(){
     
     measurement.setTo(Scalar(0));
     
+    cameraThreshold = 29;
+    
     KF.statePre.at<float>(0) = ballPos.x;
     KF.statePre.at<float>(1) = ballPos.y;
     KF.statePre.at<float>(2) = 0;
@@ -41,35 +50,46 @@ void testApp::setup(){
 //--------------------------------------------------------------
 void testApp::update(){
     vidGrabber.grabFrame();                                                 //get a frame from the camera
+    colorImg.setFromPixels(vidGrabber.getPixels(), camWidth, camHeight);    //remember that colorImg? put the camera image into it
+//    colorImgHSV.convertRgbToHsv();                                          //now we convert the colorImg inside colorImgHSV into HSV
     
-    colorImgHSV.setFromPixels(vidGrabber.getPixels(), camWidth, camHeight);    //remember that colorImg? put the camera image into it
-    colorImgHSV.convertRgbToHsv();                                          //now we convert the colorImg inside colorImgHSV into HSV
-    colorImgHSV.convertToGrayscalePlanarImages(hueImg, satImg, briImg);     //distribute the hue, saturation and brightness to hueImg, satImg, and briImg
+    colorImg.convertToGrayscalePlanarImages(redImg, greenImg, blueImg);     
+//    colorImgHSV.convertToGrayscalePlanarImages(hueImg, satImg, briImg);     
     
-    hueImg.flagImageChanged(); 
-    satImg.flagImageChanged();
-    briImg.flagImageChanged();
+//    hueImg.flagImageChanged(); 
+//    satImg.flagImageChanged();
+//    briImg.flagImageChanged();
     
-    unsigned char * huePixels = hueImg.getPixels();                         //huePixels is now a raw array of pixels
-    unsigned char * satPixels = satImg.getPixels();                         //satPixels is now a raw array of pixels  just like huePixels
-    unsigned char * briPixels = briImg.getPixels();
-    int nPixels = camWidth * camHeight;                                     //get the number of pixels in the images since these raw images are continuous, so no breaks
+    redImg.flagImageChanged(); 
+    greenImg.flagImageChanged();
+    blueImg.flagImageChanged();
+
+//    unsigned char * huePixels = hueImg.getPixels();                         
+//    unsigned char * satPixels = satImg.getPixels();                       
+//    unsigned char * briPixels = briImg.getPixels();
+    
+    unsigned char * redPixels = redImg.getPixels();                         
+    unsigned char * greenPixels = greenImg.getPixels();                         
+    unsigned char * bluePixels = blueImg.getPixels();
+    
+    int nPixels = camWidth * camHeight;        
     
     // Color tracking filter
     for (int i = 0; i < nPixels; i++){                                           
-        if ((huePixels[i] >= one.hue - 100 && huePixels[i] <= one.hue + 100) &&    
-            (satPixels[i] >= one.sat - 12 && satPixels[i] <= one.sat + 12)) {    
-            colorTrackedPixelsRed[i] = 255;                                 
-        } 
-        else {
-            colorTrackedPixelsRed[i] = 0;                                        
-        }
+        ofVec3f colorVec = ofVec3f(redPixels[i], greenPixels[i], bluePixels[i]);
+        
+        float distance = colorVec.distance(trackedColor);
+        
+        if (distance < cameraThreshold)
+            colorTrackedPixels[i] = 255;
+        else
+            colorTrackedPixels[i] = 0;
     }
     
-    trackedImage.setFromPixels(colorTrackedPixelsRed, camWidth, camHeight);              // set reds from the colorTrackedPixelsRed array so it's all clean and openCv operable
-    trackedImage.setROI(0, ROI_Y_OFFSET, camWidth, ROI_Y_HEIGHT);                        // clamp
+    trackedImage.setFromPixels(colorTrackedPixels, camWidth, camHeight);            
+    trackedImage.setROI(0, ROI_Y_OFFSET, camWidth, ROI_Y_HEIGHT);            
     
-    ballFinder.findContours(trackedImage, 50, 100, 5, false, false);                  //lets find one (1) blob in the grayscale openCv image reds
+    ballFinder.findContours(trackedImage, 10, 100, 5, false, false);                  //lets find one (1) blob in the grayscale openCv image reds
     
     // Filter out random blobs and get ball position
     for (int i = 0; i < ballFinder.blobs.size(); i++) {
@@ -122,7 +142,7 @@ void testApp::draw(){
     glPopMatrix();
     
     ofColor c;
-    c.setHsb(one.hue, one.sat, one.bri);
+    c.set(trackedColor.x, trackedColor.y, trackedColor.z);
     ofSetColor(c);
     
     // Draw racked color reference
@@ -141,21 +161,33 @@ void testApp::draw(){
     glTranslated(0, 300, 0);
     ofSetColor(255, 0, 255);
     ofCircle(ballPos, 5);
+    
+    trackedImage.draw(680, 0);
 }
 
 //--------------------------------------------------------------
 void testApp::mousePressed(int x, int y, int button){
     
-    unsigned char * huePixels = hueImg.getPixels();  //teh hue
-    unsigned char * satPixels = satImg.getPixels();  //teh saturation
-    unsigned char * briPixels = briImg.getPixels();  //teh brightness*/ //unnecessary really, hue and sat should be enough
+    unsigned char * redPixels = redImg.getPixels(); 
+    unsigned char * greenPixels = greenImg.getPixels();  
+    unsigned char * bluePixels = blueImg.getPixels();  
     
-    x = MIN(x,hueImg.width-1);     //find the smallest value out of those two so we don't crash if we click outside of the camera image
-    y = MIN(y,hueImg.height-1);
+    x = MIN(x,redImg.width-1);     
+    y = MIN(y,redImg.height-1);
     
     if(button == 0) {
-        one.hue = huePixels[x+(y*hueImg.width)];  //set the hue
-        one.sat = satPixels[x+(y*satImg.width)];  //set the sat
-        one.bri = briPixels[x+(y*briImg.width)];
+        trackedColor.x = redPixels[x+(y*hueImg.width)];
+        trackedColor.y = greenPixels[x+(y*satImg.width)];  
+        trackedColor.z = bluePixels[x+(y*briImg.width)];
     }
+}
+
+//--------------------------------------------------------------
+void testApp::keyPressed  (int key){
+    if (key == 'a')
+        cameraThreshold++;
+    else if (key == 's')
+        cameraThreshold--;
+    
+    cout << cameraThreshold << endl;
 }
