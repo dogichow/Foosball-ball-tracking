@@ -4,7 +4,7 @@
 #include "ofMain.h"
 #include "ofxOpenCv.h"
 #include "ofxOsc.h"
-
+#include "ofxOpticalFlowLK.h"
 #include "constants.h"
 
 using namespace cv;
@@ -55,10 +55,14 @@ public:
     // OSC sender
     ofxOscSender sender;
     
+    // Kalman filter
     KalmanFilter KF;
     Mat_<float> state;
     Mat processNoise;
     Mat_<float> measurement;
+    
+    // Optical flow
+    ofxOpticalFlowLK		flow;
 };
 
 #endif

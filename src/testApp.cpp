@@ -56,6 +56,9 @@ void testApp::setup(){
     setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
     setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
     setIdentity(KF.errorCovPost, Scalar::all(.1));
+    
+    // Optical flow
+    flow.setup(camWidth,camHeight);
 }
 
 //--------------------------------------------------------------
@@ -140,6 +143,12 @@ void testApp::update(){
     m.addFloatArg( ballPos.y );
     m.addIntArg( ofGetSystemTimeMicros() );
     sender.sendMessage( m );
+    
+    /**************
+      Optical flow
+     **************/
+    
+    flow.update(colorImgHSV);
 }
 
 //--------------------------------------------------------------
@@ -183,6 +192,8 @@ void testApp::draw(){
     glTranslated(0, 300, 0);
     ofSetColor(255, 0, 255);
     ofCircle(ballPos, 5);
+    
+    flow.draw();
 }
 
 //--------------------------------------------------------------
